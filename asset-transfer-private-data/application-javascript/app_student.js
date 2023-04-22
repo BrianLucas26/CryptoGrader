@@ -132,13 +132,49 @@ async function login() {
     return contractOrg2
 }
 
-// post assignment, create asset and transfer to students
-function submitAssignment() {
-    
+// submit assignment, update asset, transfer to instructor
+async function submitAssignment(contractOrg2, contractOrg1) {
+    let assetID2 = `asset2`;
+    const assetType = 'ValuableAsset';
+    let result;
+    let asset1Data = { objectType: assetType, assetID: assetID2, essay: 'CS 1511', grade: 20, name: "joel", appraisedValue: 100 };
+
+    console.log('\n**************** As Org2 Client ****************');
+    console.log('Adding Assets to work with:\n--> Submit Transaction: CreateAsset ' + assetID2);
+    let statefulTxn = contractOrg2.createTransaction('CreateAsset');
+    // if you need to customize endorsement to specific set of Orgs, use setEndorsingOrganizations
+    // statefulTxn.setEndorsingOrganizations(mspOrg1);
+    let tmapData = Buffer.from(JSON.stringify(asset1Data));
+    statefulTxn.setTransient({
+        asset_properties: tmapData
+    });
+    result = await statefulTxn.submit();
+
+    // // Buyer from Org2 agrees to buy the asset assetID2 //
+    // // To purchase the asset, the buyer needs to agree to the same value as the asset owner
+    // let dataForAgreement = { assetID: assetID2, appraisedValue: 100 };
+    // console.log('\n--> Submit Transaction: AgreeToTransfer payload ' + JSON.stringify(dataForAgreement));
+    // statefulTxn = contractOrg1.createTransaction('AgreeToTransfer');
+    // tmapData = Buffer.from(JSON.stringify(dataForAgreement));
+    // statefulTxn.setTransient({
+    //     asset_value: tmapData
+    // });
+    // result = await statefulTxn.submit();
+
+    // Transfer the asset to Org2 //
+    // To transfer the asset, the owner needs to pass the MSP ID of new asset owner, and initiate the transfer
+    console.log('\n--> Submit Transaction: TransferAsset ' + assetID2);
+
+    statefulTxn = contractOrg2.createTransaction('TransferAsset');
+    tmapData = Buffer.from(JSON.stringify(buyerDetails));
+    statefulTxn.setTransient({
+        asset_owner: tmapData
+    });
+    result = await statefulTxn.submit();
 }
 
 // view submission, read asset
-function viewAssignment() {
+async function viewAssignment() {
 
 }
 
@@ -149,7 +185,9 @@ function viewAssignment() {
 // In real world the Org1 & Org2 identity will be used in different apps to achieve asset transfer.
 async function main() {
     try {
-        instructor = login()
+        contractOrg2 = login()
+        submitAssignment(contractOrg2, org1PrivateCollectionName)
+        viewAssignment(org1PrivateCollectionName)
     } catch (error) {
         console.error(`Error in transaction: ${error}`);
         if (error.stack) {
