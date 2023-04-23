@@ -46,9 +46,12 @@ exports.buildWallet = async (Wallets, walletPath) => {
 	// Create a new  wallet : Note that wallet is for managing identities.
 	let wallet;
 	if (walletPath) {
+		console.log('\n**************** line 49 ****************')
+		console.log('\n**************** WALLET PATH ****************' + walletPath)
 		wallet = await Wallets.newFileSystemWallet(walletPath);
 		console.log(`Built a file system wallet at ${walletPath}`);
 	} else {
+		console.log('\n**************** line 53 ****************')
 		wallet = await Wallets.newInMemoryWallet();
 		console.log('Built an in memory wallet');
 	}
