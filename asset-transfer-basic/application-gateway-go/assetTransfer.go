@@ -16,6 +16,8 @@ import (
 	"os"
 	"path"
 	"time"
+	"strings"
+	"bufio"
 
 	"github.com/hyperledger/fabric-gateway/pkg/client"
 	"github.com/hyperledger/fabric-gateway/pkg/identity"
@@ -39,6 +41,10 @@ var now = time.Now()
 var assetId = fmt.Sprintf("asset%d", now.Unix()*1e3+int64(now.Nanosecond())/1e6)
 
 func main() {
+
+	username := login()
+	fmt.Println(username)
+
 	// The gRPC client connection should be shared by all Gateway connections to this endpoint
 	clientConnection := newGrpcConnection()
 	defer clientConnection.Close()
@@ -76,12 +82,79 @@ func main() {
 	network := gw.GetNetwork(channelName)
 	contract := network.GetContract(chaincodeName)
 
+	quit := false
+	for !quit {
+		args := strings.Fields(getInput("Enter command: "))
+		if len(args) == 2 {
+			switch args[0] {
+			case "v":					// view assignment
+				fmt.Println("Viewing assignment", args[1]) 
+			case "g":					// grade assignment
+				fmt.Println("Grading assignment", args[1]) 
+			default:
+				fmt.Println("Unrecognized command, please try again.") 
+			}
+		} else if len(args) == 1 {
+			switch args[0] {
+			case "c":					// create new assignment (and post)
+				fmt.Println("Creating new assignment")
+				createAssignment(contract, username)
+				// createAsset(contract)
+			case "q":
+				fmt.Println("Quitting")
+				quit = true
+			default:
+				fmt.Println("Unrecognized command, please try again.") 
+			}
+		} else {
+			fmt.Println("Invalid command, please try again.")
+		}
+	}
+
 	initLedger(contract)
 	getAllAssets(contract)
 	createAsset(contract)
 	readAssetByID(contract)
 	transferAssetAsync(contract)
 	exampleErrorHandling(contract)
+}
+
+func login() string {
+	fmt.Println("Please first login.")
+	var username string
+	input := false
+	for !input {
+		args := strings.Fields(getInput("Username: "))
+		switch len(args) {
+		case 1:
+			username = args[0]
+			input = true
+		default:
+			fmt.Println("Invalid number of arguments, try again.")
+		}
+	}
+	fmt.Println("Successfully logged in as", username)
+	return username
+}
+
+func getInput(prompt string) string {
+	fmt.Print(prompt)
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	return input[:len(input)-1] // strip trailing '\n'
+}
+
+func createAssignment(contract *client.Contract, username string) {
+	title := getInput("Assignment title: ")
+	date := getInput("Assignment due date: ")
+	//desc := getInput("Assignment description: ")
+
+	_, err := contract.SubmitTransaction("CreateAsset", title, date, "0", username, "0")
+	if err != nil {
+		panic(fmt.Errorf("failed to submit transaction: %w", err))
+	}
+
+	fmt.Printf("*** Transaction committed successfully\n")
 }
 
 // newGrpcConnection creates a gRPC connection to the Gateway server.
@@ -277,3 +350,4 @@ func formatJSON(data []byte) string {
 	}
 	return prettyJSON.String()
 }
+
