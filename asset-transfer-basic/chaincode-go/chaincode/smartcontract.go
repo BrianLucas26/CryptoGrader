@@ -275,6 +275,9 @@ func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface
 		if err != nil {
 			return nil, err
 		}
+		if asset.InstructorID == username {
+			assets = append(assets, &asset)
+		}
 		assets = append(assets, &asset)
 	}
 
@@ -303,7 +306,36 @@ func (s *SmartContract) GetAllAssignments(ctx contractapi.TransactionContextInte
 		if err != nil {
 			return nil, err
 		}
-		if asset.Owner[len(asset.Owner)-len(username):] == username {
+		if asset.Owner == username {
+			assets = append(assets, &asset)
+		}
+	}
+
+	return assets, nil
+}
+
+func (s *SmartContract) GetSubmittedAssignments(ctx contractapi.TransactionContextInterface, username string) ([]*Asset, error) {
+	// range query with empty string for startKey and endKey does an
+	// open-ended query of all assets in the chaincode namespace.
+	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	var assets []*Asset
+	for resultsIterator.HasNext() {
+		queryResponse, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var asset Asset
+		err = json.Unmarshal(queryResponse.Value, &asset)
+		if err != nil {
+			return nil, err
+		}
+		if asset.ID[len(asset.ID) - len(username):] == username {
 			assets = append(assets, &asset)
 		}
 	}
