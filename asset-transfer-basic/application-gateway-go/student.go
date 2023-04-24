@@ -308,10 +308,23 @@ func printAssignments(contract *client.Contract, username string) {
 	}
 	//result := formatJSON(evaluateResult)
 
-	fmt.Println("Assignments:")
+	fmt.Println("Current Assignments:")
 	var parsedResult []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
 	for _, asset := range parsedResult {
+		fmt.Println(asset["Title"].(string));
+	}
+
+	evaluateResult, err = contract.EvaluateTransaction("GetSubmittedAssignments", username)
+	if err != nil {
+		//panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+	}
+	//result := formatJSON(evaluateResult)
+
+	fmt.Println("Past Assignments:")
+	var parsedResult2 []map[string]interface{}
+	json.Unmarshal(evaluateResult, &parsedResult2)
+	for _, asset := range parsedResult2 {
 		fmt.Println(asset["Title"].(string));
 	}
 }
