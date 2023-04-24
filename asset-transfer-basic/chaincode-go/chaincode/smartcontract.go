@@ -335,7 +335,7 @@ func (s *SmartContract) GetSubmittedAssignments(ctx contractapi.TransactionConte
 		if err != nil {
 			return nil, err
 		}
-		if asset.ID[len(asset.ID) - len(username):] == username {
+		if asset.ID[len(asset.ID) - len(username):] == username && asset.Owner != username {
 			assets = append(assets, &asset)
 		}
 	}
