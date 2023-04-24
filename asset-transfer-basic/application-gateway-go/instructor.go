@@ -85,7 +85,7 @@ func main() {
 	print := true
 	for !quit {
 		if print {
-			printAssignments(contract)
+			printAssignments(contract, username)
 		}
 		print = true
 		args := strings.Fields(getInput("Enter command: "))
@@ -95,7 +95,7 @@ func main() {
 				fmt.Println("Viewing assignment", args[1])
 				print = false
 				if args[1] == "all" {
-					getAllAssets(contract)
+					getAllAssets(contract, username)
 				} else {
 					// viewSubmission(contract, args[1])
 					readAssetByID(contract, args[1])
@@ -295,10 +295,10 @@ func initLedger(contract *client.Contract) {
 }
 
 // Evaluate a transaction to query ledger state.
-func getAllAssets(contract *client.Contract) {
+func getAllAssets(contract *client.Contract, username string) {
 	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
 
-	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets")
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets", username)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
