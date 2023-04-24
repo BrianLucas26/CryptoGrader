@@ -254,7 +254,7 @@ func (s *SmartContract) SubmitAssignment(ctx contractapi.TransactionContextInter
 }
 
 // GetAllAssets returns all assets found in world state
-func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface) ([]*Asset, error) {
+func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface, username string) ([]*Asset, error) {
 	// range query with empty string for startKey and endKey does an
 	// open-ended query of all assets in the chaincode namespace.
 	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
