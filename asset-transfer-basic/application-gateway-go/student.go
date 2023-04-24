@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/x509"
@@ -15,9 +16,8 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 	"strings"
-	"bufio"
+	"time"
 
 	"github.com/hyperledger/fabric-gateway/pkg/client"
 	"github.com/hyperledger/fabric-gateway/pkg/identity"
@@ -87,12 +87,18 @@ func main() {
 		args := strings.Fields(getInput("Enter command: "))
 		if len(args) == 2 {
 			switch args[0] {
-			case "v":					// view assignment
-				fmt.Println("Viewing assignment", args[1]) 
-			case "s":					// grade assignment
-				fmt.Println("Submitting assignment", args[1]) 
+			case "v": // view assignment
+				fmt.Println("Viewing assignment", args[1])
+				if args[1] == "all" {
+					getAllAssets(contract, username)
+				} else {
+					readAssetByID(contract, args[1], username)
+				}
+			case "s": // submit assignment
+				fmt.Println("Submitting assignment", args[1])
+				submitAssignment(contract, args[1], username)
 			default:
-				fmt.Println("Unrecognized command, please try again.") 
+				fmt.Println("Unrecognized command, please try again.")
 			}
 		} else if len(args) == 1 {
 			switch args[0] {
@@ -100,19 +106,19 @@ func main() {
 				fmt.Println("Quitting")
 				quit = true
 			default:
-				fmt.Println("Unrecognized command, please try again.") 
+				fmt.Println("Unrecognized command, please try again.")
 			}
 		} else {
 			fmt.Println("Invalid command, please try again.")
 		}
 	}
 
-	initLedger(contract)
-	getAllAssets(contract)
-	createAsset(contract)
-	readAssetByID(contract)
-	transferAssetAsync(contract)
-	exampleErrorHandling(contract)
+	// initLedger(contract)
+	// getAllAssets(contract)
+	// createAsset(contract)
+	// readAssetByID(contract)
+	// transferAssetAsync(contract)
+	// exampleErrorHandling(contract)
 }
 
 func login() string {
@@ -138,6 +144,55 @@ func getInput(prompt string) string {
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	return input[:len(input)-1] // strip trailing '\n'
+}
+
+func submitAssignment(contract *client.Contract, assignmentId, username string) {
+	work := getInput("Answer: ")
+
+	fmt.Printf("\n--> Evaluate Transaction: ReadAsset, function returns asset attributes\n")
+
+	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assignmentId+username)
+	if err != nil {
+		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+	}
+	var parsedResult map[string]interface{}
+	json.Unmarshal(evaluateResult, &parsedResult)
+
+	fmt.Printf("\n--> Async Submit Transaction: TransferAsset, updates existing asset work")
+
+	submitResult, commit, err := contract.SubmitAsync("SubmitAssignment", client.WithArguments(assignmentId+username, work))
+	if err != nil {
+		panic(fmt.Errorf("failed to submit transaction asynchronously: %w", err))
+	}
+
+	fmt.Printf("\n*** Successfully submitted transaction to transfer ownership from %s to Mark. \n", string(submitResult))
+	fmt.Println("*** Waiting for transaction commit.")
+
+	if commitStatus, err := commit.Status(); err != nil {
+		panic(fmt.Errorf("failed to get commit status: %w", err))
+	} else if !commitStatus.Successful {
+		panic(fmt.Errorf("transaction %s failed to commit with status: %d", commitStatus.TransactionID, int32(commitStatus.Code)))
+	}
+
+	fmt.Printf("*** Transaction committed successfully\n")
+
+	fmt.Printf("\n--> Async Submit Transaction: TransferAsset, updates existing asset owner")
+
+	submitResult, commit, err = contract.SubmitAsync("TransferAsset", client.WithArguments(assignmentId+username, parsedResult["InstructorID"].(string)))
+	if err != nil {
+		panic(fmt.Errorf("failed to submit transaction asynchronously: %w", err))
+	}
+
+	fmt.Printf("\n*** Successfully submitted transaction to transfer ownership from %s to Mark. \n", string(submitResult))
+	fmt.Println("*** Waiting for transaction commit.")
+
+	if commitStatus, err := commit.Status(); err != nil {
+		panic(fmt.Errorf("failed to get commit status: %w", err))
+	} else if !commitStatus.Successful {
+		panic(fmt.Errorf("transaction %s failed to commit with status: %d", commitStatus.TransactionID, int32(commitStatus.Code)))
+	}
+
+	fmt.Printf("*** Transaction committed successfully\n")
 }
 
 func createAssignment(contract *client.Contract, username string) {
@@ -234,10 +289,10 @@ func initLedger(contract *client.Contract) {
 }
 
 // Evaluate a transaction to query ledger state.
-func getAllAssets(contract *client.Contract) {
+func getAllAssets(contract *client.Contract, username string) {
 	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
 
-	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets")
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssignments", username)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
@@ -259,10 +314,10 @@ func createAsset(contract *client.Contract) {
 }
 
 // Evaluate a transaction by assetID to query ledger state.
-func readAssetByID(contract *client.Contract) {
+func readAssetByID(contract *client.Contract, assetId, username string) {
 	fmt.Printf("\n--> Evaluate Transaction: ReadAsset, function returns asset attributes\n")
 
-	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assetId)
+	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assetId+username)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
