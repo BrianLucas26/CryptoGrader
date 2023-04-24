@@ -1,6 +1,5 @@
 /*
 Copyright 2021 IBM All Rights Reserved.
-
 SPDX-License-Identifier: Apache-2.0
 */
 
@@ -83,12 +82,18 @@ func main() {
 	contract := network.GetContract(chaincodeName)
 
 	quit := false
+	print := true
 	for !quit {
+		if print {
+			printAssignments(contract, username)
+		}
+		print = true
 		args := strings.Fields(getInput("Enter command: "))
 		if len(args) == 2 {
 			switch args[0] {
 			case "v": // view assignment
 				fmt.Println("Viewing assignment", args[1])
+				print = false
 				if args[1] == "all" {
 					getAllAssets(contract, username)
 				} else {
@@ -97,11 +102,15 @@ func main() {
 			case "s": // submit assignment
 				fmt.Println("Submitting assignment", args[1])
 				submitAssignment(contract, args[1], username)
+			case "b":
+				// back
 			default:
 				fmt.Println("Unrecognized command, please try again.")
 			}
 		} else if len(args) == 1 {
 			switch args[0] {
+			case "b":
+				// back
 			case "q":
 				fmt.Println("Quitting")
 				quit = true
@@ -147,19 +156,23 @@ func getInput(prompt string) string {
 }
 
 func submitAssignment(contract *client.Contract, assignmentId, username string) {
-	work := getInput("Answer: ")
-
+	
 	fmt.Printf("\n--> Evaluate Transaction: ReadAsset, function returns asset attributes\n")
-
+	
 	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assignmentId+username)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
 	var parsedResult map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
-
+	
 	fmt.Printf("\n--> Async Submit Transaction: TransferAsset, updates existing asset work")
-
+	
+	fmt.Println(parsedResult["Title"].(string))
+	fmt.Println(parsedResult["Date"].(string))
+	fmt.Println(parsedResult["Description"].(string))
+	
+	work := getInput("Answer: ")
 	submitResult, commit, err := contract.SubmitAsync("SubmitAssignment", client.WithArguments(assignmentId+username, work))
 	if err != nil {
 		panic(fmt.Errorf("failed to submit transaction asynchronously: %w", err))
@@ -288,6 +301,21 @@ func initLedger(contract *client.Contract) {
 	fmt.Printf("*** Transaction committed successfully\n")
 }
 
+func printAssignments(contract *client.Contract, username string) {
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssignments", username)
+	if err != nil {
+		//panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+	}
+	//result := formatJSON(evaluateResult)
+
+	fmt.Println("Assignments:")
+	var parsedResult []map[string]interface{}
+	json.Unmarshal(evaluateResult, &parsedResult)
+	for _, asset := range parsedResult {
+		fmt.Println(asset["Title"].(string));
+	}
+}
+
 // Evaluate a transaction to query ledger state.
 func getAllAssets(contract *client.Contract, username string) {
 	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
@@ -297,6 +325,12 @@ func getAllAssets(contract *client.Contract, username string) {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
 	result := formatJSON(evaluateResult)
+
+	var parsedResult []map[string]interface{}
+	json.Unmarshal(evaluateResult, &parsedResult)
+	for _, asset := range parsedResult {
+		fmt.Println(asset["Title"].(string));
+	}
 
 	fmt.Printf("*** Result:%s\n", result)
 }
