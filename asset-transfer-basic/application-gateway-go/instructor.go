@@ -1,6 +1,5 @@
 /*
 Copyright 2021 IBM All Rights Reserved.
-
 SPDX-License-Identifier: Apache-2.0
 */
 
@@ -83,20 +82,29 @@ func main() {
 	contract := network.GetContract(chaincodeName)
 	initLedger(contract)
 	quit := false
+	print := true
 	for !quit {
+		if print {
+			printAssignments(contract)
+		}
+		print = true
 		args := strings.Fields(getInput("Enter command: "))
 		if len(args) == 2 {
 			switch args[0] {
 			case "v": // view assignment
 				fmt.Println("Viewing assignment", args[1])
+				print = false
 				if args[1] == "all" {
 					getAllAssets(contract)
 				} else {
+					// viewSubmission(contract, args[1])
 					readAssetByID(contract, args[1])
 				}
 			case "g": // grade assignment
 				fmt.Println("Grading assignment", args[1])
 				gradeAssignment(contract, args[1])
+			case "b":
+				// back
 			default:
 				fmt.Println("Unrecognized command, please try again.")
 			}
@@ -106,6 +114,8 @@ func main() {
 				fmt.Println("Creating new assignment")
 				createAssignment(contract, username)
 				// createAsset(contract)
+			case "b":
+				// back
 			case "q":
 				fmt.Println("Quitting")
 				quit = true
@@ -297,6 +307,21 @@ func getAllAssets(contract *client.Contract) {
 	fmt.Printf("*** Result:%s\n", result)
 }
 
+func printAssignments(contract *client.Contract, username string) {
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets", username)
+	if err != nil {
+		//panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+	}
+	//result := formatJSON(evaluateResult)
+
+	fmt.Println("Submissions:")
+	var parsedResult []map[string]interface{}
+	json.Unmarshal(evaluateResult, &parsedResult)
+	for _, asset := range parsedResult {
+		fmt.Println(asset["ID"].(string));
+	}
+}
+
 // Submit a transaction synchronously, blocking until it has been committed to the ledger.
 func createAsset(contract *client.Contract) {
 	fmt.Printf("\n--> Submit Transaction: CreateAsset, creates new asset with ID, Color, Size, Owner and AppraisedValue arguments \n")
@@ -356,6 +381,58 @@ func readAssetByID(contract *client.Contract, assetId string) {
 	}
 
 	fmt.Printf("*** Result:%s\n", result)
+}
+
+func viewSubmission(contract *client.Contract, assetId string) {
+	fmt.Printf("\n--> Evaluate Transaction: ReadAsset, function returns asset attributes\n")
+
+	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assetId)
+	if err != nil {
+		// panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+		switch err := err.(type) {
+		case *client.EndorseError:
+			fmt.Printf("Endorse error for transaction %s with gRPC status %v: %s\n", err.TransactionID, status.Code(err), err)
+		case *client.SubmitError:
+			fmt.Printf("Submit error for transaction %s with gRPC status %v: %s\n", err.TransactionID, status.Code(err), err)
+		case *client.CommitStatusError:
+			if errors.Is(err, context.DeadlineExceeded) {
+				fmt.Printf("Timeout waiting for transaction %s commit status: %s", err.TransactionID, err)
+			} else {
+				fmt.Printf("Error obtaining commit status for transaction %s with gRPC status %v: %s\n", err.TransactionID, status.Code(err), err)
+			}
+		case *client.CommitError:
+			fmt.Printf("Transaction %s failed to commit with status %d: %s\n", err.TransactionID, int32(err.Code), err)
+		default:
+			// panic(fmt.Errorf("unexpected error type %T: %w", err, err))
+			// fmt.Printf("unexpected error type %T: %w", err, err)
+			fmt.Printf("The submission ID: " + assetId + " does not exist!\n")
+		}
+		// Any error that originates from a peer or orderer node external to the gateway will have its details
+		// embedded within the gRPC status error. The following code shows how to extract that.
+		// statusErr := status.Convert(err)
+
+		// details := statusErr.Details()
+		// if len(details) > 0 {
+		// 	fmt.Println("Error Details:")
+
+		// 	for _, detail := range details {
+		// 		switch detail := detail.(type) {
+		// 		case *gateway.ErrorDetail:
+		// 			fmt.Printf("- address: %s, mspId: %s, message: %s\n", detail.Address, detail.MspId, detail.Message)
+		// 		}
+		// 	}
+		// }
+
+	} else {
+		var parsedResult []map[string]interface{}
+		json.Unmarshal(evaluateResult, &parsedResult)
+		for _, asset := range parsedResult {
+			fmt.Println(asset["Title"].(string))
+			fmt.Println(asset["Description"].(string))
+			fmt.Println("Student response:", asset["Work"].(string))
+			fmt.Println("Grade:", asset["Grade"].(string))
+		}
+	}
 }
 
 // Submit transaction asynchronously, blocking until the transaction has been sent to the orderer, and allowing
