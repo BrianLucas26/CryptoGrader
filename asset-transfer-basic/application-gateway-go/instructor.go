@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/x509"
@@ -15,9 +16,8 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"time"
 	"strings"
-	"bufio"
+	"time"
 
 	"github.com/hyperledger/fabric-gateway/pkg/client"
 	"github.com/hyperledger/fabric-gateway/pkg/identity"
@@ -81,22 +81,28 @@ func main() {
 
 	network := gw.GetNetwork(channelName)
 	contract := network.GetContract(chaincodeName)
-
+	initLedger(contract)
 	quit := false
 	for !quit {
 		args := strings.Fields(getInput("Enter command: "))
 		if len(args) == 2 {
 			switch args[0] {
-			case "v":					// view assignment
-				fmt.Println("Viewing assignment", args[1]) 
-			case "g":					// grade assignment
-				fmt.Println("Grading assignment", args[1]) 
+			case "v": // view assignment
+				fmt.Println("Viewing assignment", args[1])
+				if args[1] == "all" {
+					getAllAssets(contract)
+				} else {
+					readAssetByID(contract, args[1])
+				}
+			case "g": // grade assignment
+				fmt.Println("Grading assignment", args[1])
+				gradeAssignment(contract, args[1])
 			default:
-				fmt.Println("Unrecognized command, please try again.") 
+				fmt.Println("Unrecognized command, please try again.")
 			}
 		} else if len(args) == 1 {
 			switch args[0] {
-			case "c":					// create new assignment (and post)
+			case "c": // create new assignment (and post)
 				fmt.Println("Creating new assignment")
 				createAssignment(contract, username)
 				// createAsset(contract)
@@ -104,19 +110,41 @@ func main() {
 				fmt.Println("Quitting")
 				quit = true
 			default:
-				fmt.Println("Unrecognized command, please try again.") 
+				fmt.Println("Unrecognized command, please try again.")
 			}
 		} else {
 			fmt.Println("Invalid command, please try again.")
 		}
 	}
 
-	initLedger(contract)
-	getAllAssets(contract)
-	createAsset(contract)
-	readAssetByID(contract)
-	transferAssetAsync(contract)
-	exampleErrorHandling(contract)
+	// initLedger(contract)
+	// getAllAssets(contract)
+	// createAsset(contract)
+	// readAssetByID(contract)
+	// transferAssetAsync(contract)
+	// exampleErrorHandling(contract)
+}
+
+func gradeAssignment(contract *client.Contract, assetId string) {
+	grade := getInput("Grade: ")
+
+	fmt.Printf("\n--> Async Submit Transaction: TransferAsset, updates existing asset grade")
+
+	submitResult, commit, err := contract.SubmitAsync("GradeAssignment", client.WithArguments(assetId, grade))
+	if err != nil {
+		panic(fmt.Errorf("failed to submit transaction asynchronously: %w", err))
+	}
+
+	fmt.Printf("\n*** Successfully submitted transaction to transfer ownership from %s to Mark. \n", string(submitResult))
+	fmt.Println("*** Waiting for transaction commit.")
+
+	if commitStatus, err := commit.Status(); err != nil {
+		panic(fmt.Errorf("failed to get commit status: %w", err))
+	} else if !commitStatus.Successful {
+		panic(fmt.Errorf("transaction %s failed to commit with status: %d", commitStatus.TransactionID, int32(commitStatus.Code)))
+	}
+
+	fmt.Printf("*** Transaction committed successfully\n")
 }
 
 func login() string {
@@ -147,11 +175,30 @@ func getInput(prompt string) string {
 func createAssignment(contract *client.Contract, username string) {
 	title := getInput("Assignment title: ")
 	date := getInput("Assignment due date: ")
-	//desc := getInput("Assignment description: ")
+	desc := getInput("Assignment description: ")
+	student := getInput("For student: ")
 
-	_, err := contract.SubmitTransaction("CreateAsset", title, date, "0", username, "0")
+	_, err := contract.SubmitTransaction("CreateAsset", title+student, title, "0", username, date, desc)
 	if err != nil {
 		panic(fmt.Errorf("failed to submit transaction: %w", err))
+	}
+
+	fmt.Printf("*** Transaction committed successfully\n")
+
+	fmt.Printf("\n--> Async Submit Transaction: TransferAsset, updates existing asset owner")
+
+	submitResult, commit, err := contract.SubmitAsync("TransferAsset", client.WithArguments(title+student, student))
+	if err != nil {
+		panic(fmt.Errorf("failed to submit transaction asynchronously: %w", err))
+	}
+
+	fmt.Printf("\n*** Successfully submitted transaction to transfer ownership from %s to Mark. \n", string(submitResult))
+	fmt.Println("*** Waiting for transaction commit.")
+
+	if commitStatus, err := commit.Status(); err != nil {
+		panic(fmt.Errorf("failed to get commit status: %w", err))
+	} else if !commitStatus.Successful {
+		panic(fmt.Errorf("transaction %s failed to commit with status: %d", commitStatus.TransactionID, int32(commitStatus.Code)))
 	}
 
 	fmt.Printf("*** Transaction committed successfully\n")
@@ -263,14 +310,50 @@ func createAsset(contract *client.Contract) {
 }
 
 // Evaluate a transaction by assetID to query ledger state.
-func readAssetByID(contract *client.Contract) {
+func readAssetByID(contract *client.Contract, assetId string) {
 	fmt.Printf("\n--> Evaluate Transaction: ReadAsset, function returns asset attributes\n")
 
 	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assetId)
+	result := ""
 	if err != nil {
-		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+		// panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+		switch err := err.(type) {
+		case *client.EndorseError:
+			fmt.Printf("Endorse error for transaction %s with gRPC status %v: %s\n", err.TransactionID, status.Code(err), err)
+		case *client.SubmitError:
+			fmt.Printf("Submit error for transaction %s with gRPC status %v: %s\n", err.TransactionID, status.Code(err), err)
+		case *client.CommitStatusError:
+			if errors.Is(err, context.DeadlineExceeded) {
+				fmt.Printf("Timeout waiting for transaction %s commit status: %s", err.TransactionID, err)
+			} else {
+				fmt.Printf("Error obtaining commit status for transaction %s with gRPC status %v: %s\n", err.TransactionID, status.Code(err), err)
+			}
+		case *client.CommitError:
+			fmt.Printf("Transaction %s failed to commit with status %d: %s\n", err.TransactionID, int32(err.Code), err)
+		default:
+			// panic(fmt.Errorf("unexpected error type %T: %w", err, err))
+			// fmt.Printf("unexpected error type %T: %w", err, err)
+			fmt.Printf("The submission ID: " + assetId + " does not exist!\n")
+		}
+		// Any error that originates from a peer or orderer node external to the gateway will have its details
+		// embedded within the gRPC status error. The following code shows how to extract that.
+		// statusErr := status.Convert(err)
+
+		// details := statusErr.Details()
+		// if len(details) > 0 {
+		// 	fmt.Println("Error Details:")
+
+		// 	for _, detail := range details {
+		// 		switch detail := detail.(type) {
+		// 		case *gateway.ErrorDetail:
+		// 			fmt.Printf("- address: %s, mspId: %s, message: %s\n", detail.Address, detail.MspId, detail.Message)
+		// 		}
+		// 	}
+		// }
+
+	} else {
+		result = formatJSON(evaluateResult)
 	}
-	result := formatJSON(evaluateResult)
 
 	fmt.Printf("*** Result:%s\n", result)
 }
@@ -350,4 +433,3 @@ func formatJSON(data []byte) string {
 	}
 	return prettyJSON.String()
 }
-
