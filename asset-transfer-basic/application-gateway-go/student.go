@@ -42,7 +42,6 @@ var assetId = fmt.Sprintf("asset%d", now.Unix()*1e3+int64(now.Nanosecond())/1e6)
 func main() {
 
 	username := login()
-	fmt.Println(username)
 
 	// The gRPC client connection should be shared by all Gateway connections to this endpoint
 	clientConnection := newGrpcConnection()
@@ -83,9 +82,17 @@ func main() {
 
 	quit := false
 	print := true
+	class := ""
 	for !quit {
+		if (class == "") {
+			printClasses(contract, username)
+			args := strings.Fields(getInput("Join or create class: "))
+			if len(args) == 1 {
+				class = args[0]
+			}
+		}
 		if print {
-			printAssignments(contract, username)
+			printAssignments(contract, username, class)
 		}
 		print = true
 		args := strings.Fields(getInput("Enter command: "))
@@ -103,14 +110,14 @@ func main() {
 				fmt.Println("Submitting assignment", args[1])
 				submitAssignment(contract, args[1], username)
 			case "b":
-				// back
+				class = ""
 			default:
 				fmt.Println("Unrecognized command, please try again.")
 			}
 		} else if len(args) == 1 {
 			switch args[0] {
 			case "b":
-				// back
+				class = ""
 			case "q":
 				fmt.Println("Quitting")
 				quit = true
@@ -128,6 +135,22 @@ func main() {
 	// readAssetByID(contract)
 	// transferAssetAsync(contract)
 	// exampleErrorHandling(contract)
+}
+
+func printClasses(contract *client.Contract, username string) {
+	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
+
+	evaluateResult, err := contract.EvaluateTransaction("GetAllClasses", username)
+	if err != nil {
+		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+	}
+	var result string
+	if evaluateResult != nil {
+		result = formatJSON(evaluateResult)
+	}
+	
+	fmt.Println("Classes:")
+	fmt.Println(result)
 }
 
 func login() string {
@@ -301,13 +324,13 @@ func initLedger(contract *client.Contract) {
 	fmt.Printf("*** Transaction committed successfully\n")
 }
 
-func printAssignments(contract *client.Contract, username string) {
-	evaluateResult, err := contract.EvaluateTransaction("GetAllAssignments", username)
+func printAssignments(contract *client.Contract, username string, class string) {
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssignments", username, class)
 	if err != nil {
 		//panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
 	//result := formatJSON(evaluateResult)
-
+	fmt.Println("Class: ", class)
 	fmt.Println("Current Assignments:")
 	var parsedResult []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
