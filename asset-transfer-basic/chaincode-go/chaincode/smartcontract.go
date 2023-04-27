@@ -32,6 +32,7 @@ type Asset struct {
 	InstructorID string `json:"InstructorID"`
 	Work         string `json:"Work"`
 	Owner        string `json:"Owner"`
+	ClassID		 string `json:"ClassID"`
 }
 
 // InitLedger adds a base set of assets to the ledger
@@ -45,32 +46,32 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 	// 	{ID: "asset6", Color: "white", Size: 15, Owner: "Michel", AppraisedValue: 800},
 	// }
 
-	assets := []Asset{
-		{ID: "student1", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
-		{ID: "student2", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
-		{ID: "student3", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
-		{ID: "student4", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
-		{ID: "student5", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
-		{ID: "student6", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
-	}
+	// assets := []Asset{
+	// 	{ID: "student1", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
+	// 	{ID: "student2", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
+	// 	{ID: "student3", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
+	// 	{ID: "student4", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
+	// 	{ID: "student5", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
+	// 	{ID: "student6", Title: "Title1", Date: "4/24/2023", Description: "Description 1", Grade: 0, Owner: "Instructor", Work: "", InstructorID: "Instructor"},
+	// }
 
-	for _, asset := range assets {
-		assetJSON, err := json.Marshal(asset)
-		if err != nil {
-			return err
-		}
+	// for _, asset := range assets {
+	// 	assetJSON, err := json.Marshal(asset)
+	// 	if err != nil {
+	// 		return err
+	// 	}
 
-		err = ctx.GetStub().PutState(asset.ID, assetJSON)
-		if err != nil {
-			return fmt.Errorf("failed to put to world state. %v", err)
-		}
-	}
+	// 	err = ctx.GetStub().PutState(asset.ID, assetJSON)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to put to world state. %v", err)
+	// 	}
+	// }
 
 	return nil
 }
 
 // CreateAsset issues a new asset to the world state with given details.
-func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface, id string, title string, grade int, owner string, date string, description string) error {
+func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface, id string, title string, grade int, owner string, date string, description string, class string) error {
 	exists, err := s.AssetExists(ctx, id)
 	if err != nil {
 		return err
@@ -96,6 +97,7 @@ func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
 		Grade:        grade,
 		Work:         "",
 		Owner:        owner,
+		ClassID:	  class,
 	}
 
 	assetJSON, err := json.Marshal(asset)
@@ -126,7 +128,7 @@ func (s *SmartContract) ReadAsset(ctx contractapi.TransactionContextInterface, i
 }
 
 // UpdateAsset updates an existing asset in the world state with provided parameters.
-func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface, id string, title string, grade int, owner string, date string, description string) error {
+func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface, id string, title string, grade int, owner string, date string, description string, class string) error {
 	exists, err := s.AssetExists(ctx, id)
 	if err != nil {
 		return err
@@ -152,6 +154,7 @@ func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface,
 		InstructorID: "",
 		Grade:        grade,
 		Owner:        owner,
+		ClassID: 	  class,
 	}
 	assetJSON, err := json.Marshal(asset)
 	if err != nil {
@@ -254,7 +257,7 @@ func (s *SmartContract) SubmitAssignment(ctx contractapi.TransactionContextInter
 }
 
 // GetAllAssets returns all assets found in world state
-func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface, username string) ([]*Asset, error) {
+func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface, username string, class string) ([]*Asset, error) {
 	// range query with empty string for startKey and endKey does an
 	// open-ended query of all assets in the chaincode namespace.
 	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
@@ -275,17 +278,51 @@ func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface
 		if err != nil {
 			return nil, err
 		}
-		if asset.InstructorID == username {
+		if asset.InstructorID == username && asset.Owner == username && asset.ClassID == class{
 			assets = append(assets, &asset)
 		}
-		assets = append(assets, &asset)
+		//assets = append(assets, &asset)
 	}
 
 	return assets, nil
+}
+
+// GetAllClasses returns all classes of a given username
+func (s *SmartContract) GetAllClasses(ctx contractapi.TransactionContextInterface, username string) ([]string, error) {
+	// range query with empty string for startKey and endKey does an
+	// open-ended query of all assets in the chaincode namespace.
+	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer resultsIterator.Close()
+
+	var classes map[string]int
+	for resultsIterator.HasNext() {
+		queryResponse, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var asset Asset
+		err = json.Unmarshal(queryResponse.Value, &asset)
+		if err != nil {
+			return nil, err
+		}
+		if asset.InstructorID == username && asset.Owner == username {
+			classes[asset.ClassID] = 1
+		}
+	}
+	var result []string
+	for class, _ := range(classes) {
+		result = append(result, class)
+	}
+
+	return result, nil
 }
 
 // GetAllAssets returns all assets found in world state
-func (s *SmartContract) GetAllAssignments(ctx contractapi.TransactionContextInterface, username string) ([]*Asset, error) {
+func (s *SmartContract) GetAllAssignments(ctx contractapi.TransactionContextInterface, username string, class string) ([]*Asset, error) {
 	// range query with empty string for startKey and endKey does an
 	// open-ended query of all assets in the chaincode namespace.
 	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
@@ -306,7 +343,7 @@ func (s *SmartContract) GetAllAssignments(ctx contractapi.TransactionContextInte
 		if err != nil {
 			return nil, err
 		}
-		if asset.Owner == username {
+		if asset.Owner == username && asset.ClassID == class{
 			assets = append(assets, &asset)
 		}
 	}
@@ -314,7 +351,7 @@ func (s *SmartContract) GetAllAssignments(ctx contractapi.TransactionContextInte
 	return assets, nil
 }
 
-func (s *SmartContract) GetSubmittedAssignments(ctx contractapi.TransactionContextInterface, username string) ([]*Asset, error) {
+func (s *SmartContract) GetSubmittedAssignments(ctx contractapi.TransactionContextInterface, username string, class string) ([]*Asset, error) {
 	// range query with empty string for startKey and endKey does an
 	// open-ended query of all assets in the chaincode namespace.
 	resultsIterator, err := ctx.GetStub().GetStateByRange("", "")
@@ -335,7 +372,7 @@ func (s *SmartContract) GetSubmittedAssignments(ctx contractapi.TransactionConte
 		if err != nil {
 			return nil, err
 		}
-		if asset.ID[len(asset.ID) - len(username):] == username && asset.Owner != username {
+		if asset.ID[len(asset.ID) - len(username):] == username && asset.Owner != username && asset.ClassID == class {
 			assets = append(assets, &asset)
 		}
 	}
