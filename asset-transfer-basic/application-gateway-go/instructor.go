@@ -42,7 +42,6 @@ var assetId = fmt.Sprintf("asset%d", now.Unix()*1e3+int64(now.Nanosecond())/1e6)
 func main() {
 
 	username := login()
-	fmt.Println(username)
 
 	// The gRPC client connection should be shared by all Gateway connections to this endpoint
 	clientConnection := newGrpcConnection()
@@ -83,9 +82,17 @@ func main() {
 	initLedger(contract)
 	quit := false
 	print := true
+	class := ""
 	for !quit {
+		if (class == "") {
+			printClasses(contract, username)
+			args := strings.Fields(getInput("Join or create class: "))
+			if len(args) == 1 {
+				class = args[0]
+			}
+		}
 		if print {
-			printAssignments(contract, username)
+			printAssignments(contract, username, class)
 		}
 		print = true
 		args := strings.Fields(getInput("Enter command: "))
@@ -95,7 +102,7 @@ func main() {
 				fmt.Println("Viewing assignment", args[1])
 				print = false
 				if args[1] == "all" {
-					getAllAssets(contract, username)
+					getAllAssets(contract, username, class)
 				} else {
 					// viewSubmission(contract, args[1])
 					readAssetByID(contract, args[1])
@@ -104,7 +111,7 @@ func main() {
 				fmt.Println("Grading assignment", args[1])
 				gradeAssignment(contract, args[1])
 			case "b":
-				// back
+				class = ""
 			default:
 				fmt.Println("Unrecognized command, please try again.")
 			}
@@ -112,10 +119,10 @@ func main() {
 			switch args[0] {
 			case "c": // create new assignment (and post)
 				fmt.Println("Creating new assignment")
-				createAssignment(contract, username)
+				createAssignment(contract, username, class)
 				// createAsset(contract)
 			case "b":
-				// back
+				class = ""
 			case "q":
 				fmt.Println("Quitting")
 				quit = true
@@ -133,6 +140,22 @@ func main() {
 	// readAssetByID(contract)
 	// transferAssetAsync(contract)
 	// exampleErrorHandling(contract)
+}
+
+func printClasses(contract *client.Contract, username string) {
+	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
+
+	evaluateResult, err := contract.EvaluateTransaction("GetAllClasses", username)
+	if err != nil {
+		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
+	}
+	var result string
+	if evaluateResult != nil {
+		result = formatJSON(evaluateResult)
+	}
+	
+	fmt.Println("Classes:")
+	fmt.Println(result)
 }
 
 func gradeAssignment(contract *client.Contract, assetId string) {
@@ -182,13 +205,13 @@ func getInput(prompt string) string {
 	return input[:len(input)-1] // strip trailing '\n'
 }
 
-func createAssignment(contract *client.Contract, username string) {
+func createAssignment(contract *client.Contract, username string, class string) {
 	title := getInput("Assignment title: ")
 	date := getInput("Assignment due date: ")
 	desc := getInput("Assignment description: ")
 	student := getInput("For student: ")
 
-	_, err := contract.SubmitTransaction("CreateAsset", title+student, title, "0", username, date, desc)
+	_, err := contract.SubmitTransaction("CreateAsset", title+student, title, "0", username, date, desc, class)
 	if err != nil {
 		panic(fmt.Errorf("failed to submit transaction: %w", err))
 	}
@@ -295,10 +318,10 @@ func initLedger(contract *client.Contract) {
 }
 
 // Evaluate a transaction to query ledger state.
-func getAllAssets(contract *client.Contract, username string) {
+func getAllAssets(contract *client.Contract, username string, class string) {
 	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
 
-	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets", username)
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets", username, class)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
@@ -307,13 +330,13 @@ func getAllAssets(contract *client.Contract, username string) {
 	fmt.Printf("*** Result:%s\n", result)
 }
 
-func printAssignments(contract *client.Contract, username string) {
-	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets", username)
+func printAssignments(contract *client.Contract, username string, class string) {
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssets", username, class)
 	if err != nil {
 		//panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
 	//result := formatJSON(evaluateResult)
-
+	fmt.Println("Class: ", class)
 	fmt.Println("Submissions:")
 	var parsedResult []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
