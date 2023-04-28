@@ -2,8 +2,6 @@
 
 This is our implementation of the Final Project for CS-2510 (Distributed) Computer Operating Systems. This file gives instructions on how to set up the network and run the client programs as student or instructor.
 
-### Application
-
 ## Running the application
 
 The Fabric test network is used to deploy and run this sample. Follow these steps in order:
