@@ -84,7 +84,7 @@ func main() {
 	print := true
 	class := ""
 	for !quit {
-		if (class == "") {
+		if class == "" {
 			printClasses(contract, username)
 			args := strings.Fields(getInput("Join or create class: "))
 			if len(args) == 1 {
@@ -102,7 +102,7 @@ func main() {
 				fmt.Println("Viewing assignment", args[1])
 				print = false
 				if args[1] == "all" {
-					getAllAssets(contract, username)
+					getAllAssets(contract, username, class)
 				} else {
 					readAssetByID(contract, args[1], username)
 				}
@@ -148,7 +148,7 @@ func printClasses(contract *client.Contract, username string) {
 	if evaluateResult != nil {
 		result = formatJSON(evaluateResult)
 	}
-	
+
 	fmt.Println("Classes:")
 	fmt.Println(result)
 }
@@ -179,22 +179,22 @@ func getInput(prompt string) string {
 }
 
 func submitAssignment(contract *client.Contract, assignmentId, username string) {
-	
+
 	fmt.Printf("\n--> Evaluate Transaction: ReadAsset, function returns asset attributes\n")
-	
+
 	evaluateResult, err := contract.EvaluateTransaction("ReadAsset", assignmentId+username)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
 	var parsedResult map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
-	
+
 	fmt.Printf("\n--> Async Submit Transaction: TransferAsset, updates existing asset work")
-	
+
 	fmt.Println(parsedResult["Title"].(string))
 	fmt.Println(parsedResult["Date"].(string))
 	fmt.Println(parsedResult["Description"].(string))
-	
+
 	work := getInput("Answer: ")
 	submitResult, commit, err := contract.SubmitAsync("SubmitAssignment", client.WithArguments(assignmentId+username, work))
 	if err != nil {
@@ -335,10 +335,10 @@ func printAssignments(contract *client.Contract, username string, class string) 
 	var parsedResult []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
 	for _, asset := range parsedResult {
-		fmt.Println(asset["Title"].(string));
+		fmt.Println(asset["Title"].(string))
 	}
 
-	evaluateResult, err = contract.EvaluateTransaction("GetSubmittedAssignments", username)
+	evaluateResult, err = contract.EvaluateTransaction("GetSubmittedAssignments", username, class)
 	if err != nil {
 		//panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
@@ -348,24 +348,27 @@ func printAssignments(contract *client.Contract, username string, class string) 
 	var parsedResult2 []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult2)
 	for _, asset := range parsedResult2 {
-		fmt.Println(asset["Title"].(string));
+		fmt.Println(asset["Title"].(string))
 	}
 }
 
 // Evaluate a transaction to query ledger state.
-func getAllAssets(contract *client.Contract, username string) {
+func getAllAssets(contract *client.Contract, username string, class string) {
 	fmt.Println("\n--> Evaluate Transaction: GetAllAssets, function returns all the current assets on the ledger")
 
-	evaluateResult, err := contract.EvaluateTransaction("GetAllAssignments", username)
+	evaluateResult, err := contract.EvaluateTransaction("GetAllAssignments", username, class)
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
-	result := formatJSON(evaluateResult)
+	result := ""
+	if evaluateResult != nil {
+		result = formatJSON(evaluateResult)
+	}
 
 	var parsedResult []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
 	for _, asset := range parsedResult {
-		fmt.Println(asset["Title"].(string));
+		fmt.Println(asset["Title"].(string))
 	}
 
 	fmt.Printf("*** Result:%s\n", result)
