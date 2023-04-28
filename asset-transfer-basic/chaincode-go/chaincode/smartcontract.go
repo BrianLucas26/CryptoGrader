@@ -32,7 +32,7 @@ type Asset struct {
 	InstructorID string `json:"InstructorID"`
 	Work         string `json:"Work"`
 	Owner        string `json:"Owner"`
-	ClassID		 string `json:"ClassID"`
+	ClassID      string `json:"ClassID"`
 }
 
 // InitLedger adds a base set of assets to the ledger
@@ -97,7 +97,7 @@ func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
 		Grade:        grade,
 		Work:         "",
 		Owner:        owner,
-		ClassID:	  class,
+		ClassID:      class,
 	}
 
 	assetJSON, err := json.Marshal(asset)
@@ -154,7 +154,7 @@ func (s *SmartContract) UpdateAsset(ctx contractapi.TransactionContextInterface,
 		InstructorID: "",
 		Grade:        grade,
 		Owner:        owner,
-		ClassID: 	  class,
+		ClassID:      class,
 	}
 	assetJSON, err := json.Marshal(asset)
 	if err != nil {
@@ -278,7 +278,7 @@ func (s *SmartContract) GetAllAssets(ctx contractapi.TransactionContextInterface
 		if err != nil {
 			return nil, err
 		}
-		if asset.InstructorID == username && asset.Owner == username && asset.ClassID == class{
+		if asset.InstructorID == username && asset.Owner == username && asset.ClassID == class {
 			assets = append(assets, &asset)
 		}
 		//assets = append(assets, &asset)
@@ -297,7 +297,7 @@ func (s *SmartContract) GetAllClasses(ctx contractapi.TransactionContextInterfac
 	}
 	defer resultsIterator.Close()
 
-	var classes map[string]int
+	classes := map[string]int{}
 	for resultsIterator.HasNext() {
 		queryResponse, err := resultsIterator.Next()
 		if err != nil {
@@ -309,12 +309,12 @@ func (s *SmartContract) GetAllClasses(ctx contractapi.TransactionContextInterfac
 		if err != nil {
 			return nil, err
 		}
-		if asset.InstructorID == username && asset.Owner == username {
+		if asset.InstructorID == username || asset.ID[len(asset.ID)-len(username):] == username {
 			classes[asset.ClassID] = 1
 		}
 	}
 	var result []string
-	for class, _ := range(classes) {
+	for class, _ := range classes {
 		result = append(result, class)
 	}
 
@@ -343,7 +343,7 @@ func (s *SmartContract) GetAllAssignments(ctx contractapi.TransactionContextInte
 		if err != nil {
 			return nil, err
 		}
-		if asset.Owner == username && asset.ClassID == class{
+		if asset.Owner == username && asset.ClassID == class {
 			assets = append(assets, &asset)
 		}
 	}
@@ -372,7 +372,7 @@ func (s *SmartContract) GetSubmittedAssignments(ctx contractapi.TransactionConte
 		if err != nil {
 			return nil, err
 		}
-		if asset.ID[len(asset.ID) - len(username):] == username && asset.Owner != username && asset.ClassID == class {
+		if asset.ID[len(asset.ID)-len(username):] == username && asset.Owner != username && asset.ClassID == class {
 			assets = append(assets, &asset)
 		}
 	}
