@@ -84,7 +84,7 @@ func main() {
 	print := true
 	class := ""
 	for !quit {
-		if (class == "") {
+		if class == "" {
 			printClasses(contract, username)
 			args := strings.Fields(getInput("Join or create class: "))
 			if len(args) == 1 {
@@ -153,7 +153,7 @@ func printClasses(contract *client.Contract, username string) {
 	if evaluateResult != nil {
 		result = formatJSON(evaluateResult)
 	}
-	
+
 	fmt.Println("Classes:")
 	fmt.Println(result)
 }
@@ -325,7 +325,10 @@ func getAllAssets(contract *client.Contract, username string, class string) {
 	if err != nil {
 		panic(fmt.Errorf("failed to evaluate transaction: %w", err))
 	}
-	result := formatJSON(evaluateResult)
+	result := ""
+	if evaluateResult != nil {
+		result = formatJSON(evaluateResult)
+	}
 
 	fmt.Printf("*** Result:%s\n", result)
 }
@@ -341,7 +344,7 @@ func printAssignments(contract *client.Contract, username string, class string) 
 	var parsedResult []map[string]interface{}
 	json.Unmarshal(evaluateResult, &parsedResult)
 	for _, asset := range parsedResult {
-		fmt.Println(asset["ID"].(string));
+		fmt.Println(asset["ID"].(string))
 	}
 }
 
