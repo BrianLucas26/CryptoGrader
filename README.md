@@ -2,7 +2,8 @@
 
 This is our implementation of the Final Project for CS-2510 (Distributed) Computer Operating Systems. This file gives instructions on how to set up the network and run the client programs as student or instructor.
 
-Before you begin
+## Before you begin
+
 Before you can run the test network, you need to install Fabric Samples in your environment. Follow the instructions on [getting_started](https://hyperledger-fabric.readthedocs.io/en/release-2.5/getting_started.html) to install the required software.
 
 Note: The test network has been successfully verified with Docker Desktop version 2.5.0.1 and is the recommended version at this time. Higher versions may not work.
